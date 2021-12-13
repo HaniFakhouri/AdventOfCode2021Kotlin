@@ -43,7 +43,7 @@ class Puzzle12 : PuzzleTemplate(day = 12) {
     private fun getNumberPaths(isCaveInPathFunction: (Cave, Path) -> Boolean): Int {
         // Do a BFS and maintain a queue of all paths
         val allPaths = LinkedList<Path>()
-        val initialPath = Path(caves = listOf(graph.getVertex("start")).toMutableList())
+        val initialPath = Path(caves = arrayListOf(graph.getVertex("start")))
         allPaths.push(initialPath)
 
         var nrPaths = 0
@@ -70,7 +70,7 @@ class Puzzle12 : PuzzleTemplate(day = 12) {
 
 private typealias Cave = Vertex
 
-private data class Path(val caves: MutableList<Cave> = ArrayList())
+private data class Path(val caves: ArrayList<Cave> = ArrayList())
 private data class Edge(val dest: Vertex)
 private data class Vertex(val name: String, val adj: ArrayList<Edge> = ArrayList())
 
