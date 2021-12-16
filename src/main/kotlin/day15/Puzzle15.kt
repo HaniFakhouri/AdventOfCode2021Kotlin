@@ -112,7 +112,6 @@ private data class Path(
         val otherCost: Int = other.cost
         return if (cost < otherCost) -1 else if (cost > otherCost) 1 else 0
     }
-
 }
 
 private data class Edge(
