@@ -13,9 +13,11 @@ import day12.Puzzle12
 import day13.Puzzle13
 import day14.Puzzle14
 import day15.Puzzle15
+import day16.Puzzle16
 
 fun main() {
     listOf(
+        /*
         Puzzle1(),
         Puzzle2(),
         Puzzle3(),
@@ -31,6 +33,8 @@ fun main() {
         Puzzle13(),
         Puzzle14(),
         Puzzle15(),
+        */
+        Puzzle16(),
     ).forEach {
         it.runPuzzle()
     }
