@@ -1,108 +1,100 @@
 package day16
 
 import PuzzleTemplate
-import java.math.BigInteger
+
+private val hexToIntMap = mapOf(
+    'A' to 10,
+    'B' to 11,
+    'C' to 12,
+    'D' to 13,
+    'E' to 14,
+    'F' to 15,
+)
 
 class Puzzle16 : PuzzleTemplate(day = 16) {
+
+    private val binary = inputAsStrings[0].hexToBinaryString()
 
     // Global working index
     private var index = 0
 
-    private var hex = ""
+    // Global version number sum
+    private var versionSum = 0
 
     override fun puzzleOne(answer: Int?.() -> Unit) {
-        answer(decode(inputAsStrings[0]).getVersionSum())
-    }
-
-    private fun hexStrToBinaryStr(hex: String): String {
-        val binaryStr = StringBuilder()
-        hex.forEach { digit ->
-            val decimal = hexToIntMap[digit] ?: digit.digitToInt()
-            binaryStr.append(bigIntToBinaryStr(BigInteger.valueOf(decimal.toLong())))
-        }
-        return binaryStr.toString()
-    }
-
-    // "100" -> 4
-    private fun binaryStrToBigInt(input: String) = input.toBigInteger(2)
-
-    // 4 -> "0100"
-    private fun bigIntToBinaryStr(input: BigInteger): String {
-        val binaryStr = Integer.toBinaryString(input.toInt())
-        val remainder = binaryStr.length % 4
-        return if (remainder == 0) binaryStr else
-            "0".repeat(4 - remainder) + binaryStr // prepend with zeros
-    }
-
-    private fun decode(hex: String): Packet {
         index = 0
-        val binaryStr = hexStrToBinaryStr(hex)
-        this.hex = binaryStr
-        return parsePacket(binaryStr)
+        val packet = parsePacket(binary)
+        answer(packet.version + versionSum)
+    }
+
+    private fun String.readNextBits(start: Int = 0, bits: Int): String {
+        return this.substring(index + start, index + bits).also {
+            index += bits
+        }
+    }
+
+    override fun puzzleTwoLong(answer: Long?.() -> Unit) {
+        index = 0
+        val packet = parsePacket(binary)
+        answer(packet.applyOp().value)
     }
 
     private fun parsePacket(binaryStr: String): Packet {
-        val versionBits = binaryStr.substring(index, index + 3)
-        val version = binaryStrToBigInt(versionBits).toInt()
-        index += 3
+        val versionBits = binaryStr.readNextBits(bits = 3)
+        val version = versionBits.binaryStringToLong().toInt()
 
-        val typeBits = binaryStr.substring(index, index + 3)
-        val typeId = binaryStrToBigInt(typeBits).toInt()
-        index += 3
+        val typeBits = binaryStr.readNextBits(bits = 3)
+        val typeId = typeBits.binaryStringToLong().toInt()
 
         return when (typeId) {
-            4 -> parseLiteralValuePacket(version, hex)
-            else -> parseOperatorPacket(version, typeId, hex)
+            4 -> parseLiteralValuePacket(version, binary)
+            else -> parseOperatorPacket(version, typeId, binary)
         }
     }
 
     private fun parseLiteralValuePacket(
         version: Int,
-        hex: String,
+        binary: String,
     ): Packet.LiteralValuePacket {
         var res = ""
         var firstBit = -1
         while (firstBit != 0) {
-            firstBit = hex[index].digitToInt()
-            val v = hex.substring(index + 1, index + 5)
-            res += v
-            index += 5
+            firstBit = binary[index].digitToInt()
+            res += binary.readNextBits(start = 1, bits = 5)
         }
-        val value = binaryStrToBigInt(res)
-
         return Packet.LiteralValuePacket(
             version = version,
-            value = value
+            value = res.binaryStringToLong()
         )
     }
 
     private fun parseOperatorPacket(
         version: Int,
         typeId: Int,
-        hex: String,
+        binary: String,
     ): Packet.OperatorPacket {
-        val lengthTypeId = hex[index].digitToInt()
+        val lengthTypeId = binary[index].digitToInt()
         index++
         var subPackets = ArrayList<Packet>()
 
         if (lengthTypeId == 0) {
             // then the next 15 bits are a number that represents the total length in bits of the sub-packets
             // contained by this packet.
-            val v = hex.substring(index, index + 15)
-            val totalLength = binaryStrToBigInt(v)
-            index += 15
+            val totalLength = binary.readNextBits(bits = 15).binaryStringToLong()
             val indexToStop = index + totalLength.toInt()
             while (index < indexToStop) {
-                subPackets.add(parsePacket(hex))
+                val packet = parsePacket(binary)
+                versionSum += packet.version
+                subPackets.add(reducePacketIfPossible(packet))
             }
         } else {
             // then the next 11 bits are a number that represents the number of sub-packets immediately contained
             // by this packet.
-            val v = hex.substring(index, index + 11)
-            val numberSubPackets = binaryStrToBigInt(v)
-            index += 11
+            val numberSubPackets = binary.readNextBits(bits = 11).binaryStringToLong()
             repeat(numberSubPackets.toInt()) {
-                subPackets.add(parsePacket(hex))
+                val packet = parsePacket(binary)
+                versionSum += packet.version
+                subPackets.add(reducePacketIfPossible(packet))
             }
         }
 
@@ -113,6 +105,22 @@ class Puzzle16 : PuzzleTemplate(day = 16) {
         )
     }
 
+    private fun reducePacketIfPossible(packet: Packet): Packet {
+        return if (packet.isPureOpPacket()) {
+            packet.applyOp()
+        } else {
+            packet
+        }
+    }
+
+}
+
+enum class Op(val typeId: Int) {
+    SUM(0), MUL(1), MIN(2), MAX(3), GRT(5), LES(6), EQU(7);
+
+    companion object {
+        fun parse(t: Int) = values().first { it.typeId == t }
+    }
 }
 
 private sealed class Packet(
@@ -122,7 +130,7 @@ private sealed class Packet(
 
     data class LiteralValuePacket(
         override val version: Int = 1,
-        val value: BigInteger,
+        val value: Long,
     ) : Packet(version, typeId = 4) {
         override fun toString(): String {
             return value.toString()
@@ -141,28 +149,51 @@ private sealed class Packet(
         }
     }
 
-    fun getVersionSum(): Int {
-        return when (this) {
-            is LiteralValuePacket -> this.version
-            is OperatorPacket -> this.version + this.subPackets.map { it.getVersionSum() }.sum()
+    // returns true if this packet is an operator packet with only literal sub packets i.e. an operator packet that does
+    // not contain other operator sub packets
+    fun isPureOpPacket(): Boolean {
+        if (this !is OperatorPacket) {
+            return false
         }
+        return subPackets.filterIsInstance(OperatorPacket::class.java).isEmpty()
+    }
+
+    fun applyOp(): LiteralValuePacket {
+        val value = ((this as OperatorPacket).subPackets as List<LiteralValuePacket>).applyOp(this.op)
+        return LiteralValuePacket(value = value)
     }
 
 }
 
-enum class Op(val typeId: Int) {
-    SUM(0), MUL(1), MIN(2), MAX(3), GRT(5), LES(6), EQU(7);
+// "100" -> 4
+private fun String.binaryStringToLong() = this.toLong(2)
 
-    companion object {
-        fun parse(t: Int) = values().first { it.typeId == t }
+// "2F" -> "00101111"
+private fun String.hexToBinaryString(): String {
+    val binaryStr = StringBuilder()
+    this.forEach { digit ->
+        val decimal = hexToIntMap[digit] ?: digit.digitToInt()
+        binaryStr.append(decimal.toLong().toBinaryString())
     }
+    return binaryStr.toString()
 }
 
-val hexToIntMap = mapOf(
-    'A' to 10,
-    'B' to 11,
-    'C' to 12,
-    'D' to 13,
-    'E' to 14,
-    'F' to 15,
-)
+// 4 -> "0100"
+private fun Long.toBinaryString(): String {
+    val binaryStr = Integer.toBinaryString(this.toInt())
+    val remainder = binaryStr.length % 4
+    return if (remainder == 0) binaryStr else
+        "0".repeat(4 - remainder) + binaryStr // prepend with zeros
+}
+
+private fun List<Packet.LiteralValuePacket>.applyOp(op: Op): Long {
+    return when (op) {
+        Op.SUM -> this.sumOf { it.value }
+        Op.MUL -> this.map { it.value }.reduce { acc, i -> acc * i }
+        Op.MIN -> this.minOf { it.value }
+        Op.MAX -> this.maxOf { it.value }
+        Op.GRT -> if (this[0].value > this[1].value) 1 else 0
+        Op.LES -> if (this[0].value < this[1].value) 1 else 0
+        Op.EQU -> if (this[0].value == this[1].value) 1 else 0
+    }
+}
