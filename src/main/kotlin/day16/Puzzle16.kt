@@ -142,10 +142,11 @@ private sealed class Packet(
 
     // returns true if this packet is an operator packet with only literal sub packets
     fun isPureOpPacket(): Boolean {
-        if (this !is OperatorPacket) {
-            return false
+        return if (this !is OperatorPacket) {
+            false
+        } else {
+            subPackets.filterIsInstance(OperatorPacket::class.java).isEmpty()
         }
-        return subPackets.filterIsInstance(OperatorPacket::class.java).isEmpty()
     }
 
     fun applyOp(): LiteralValuePacket {
