@@ -17,7 +17,6 @@ import day16.Puzzle16
 
 fun main() {
     listOf(
-        /*
         Puzzle1(),
         Puzzle2(),
         Puzzle3(),
@@ -33,7 +32,6 @@ fun main() {
         Puzzle13(),
         Puzzle14(),
         Puzzle15(),
-        */
         Puzzle16(),
     ).forEach {
         it.runPuzzle()

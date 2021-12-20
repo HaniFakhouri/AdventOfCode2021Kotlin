@@ -1,20 +1,17 @@
 package day16
 
 import PuzzleTemplate
-import java.lang.StringBuilder
 import java.math.BigInteger
-import kotlin.math.ceil
-import kotlin.math.log2
 
 class Puzzle16 : PuzzleTemplate(day = 16) {
 
-    var versionNumbersSum = 0
+    // Global working index
+    private var index = 0
+
+    private var hex = ""
 
     override fun puzzleOne(answer: Int?.() -> Unit) {
-        println(inputAsStrings[0])
-        decode(inputAsStrings[0])
-
-        answer(versionNumbersSum)
+        answer(decode(inputAsStrings[0]).getVersionSum())
     }
 
     private fun hexStrToBinaryStr(hex: String): String {
@@ -33,86 +30,132 @@ class Puzzle16 : PuzzleTemplate(day = 16) {
     private fun bigIntToBinaryStr(input: BigInteger): String {
         val binaryStr = Integer.toBinaryString(input.toInt())
         val remainder = binaryStr.length % 4
-
         return if (remainder == 0) binaryStr else
             "0".repeat(4 - remainder) + binaryStr // prepend with zeros
     }
 
-    private fun decode(hex: String) {
-        val binaryStr = hexStrToBinaryStr(hex) //bigIntToBinaryStr(hexStrToBigInt(hex))
-        println("hex:$hex")
-        decodeBinaryStr(binaryStr)
+    private fun decode(hex: String): Packet {
+        index = 0
+        val binaryStr = hexStrToBinaryStr(hex)
+        this.hex = binaryStr
+        return parsePacket(binaryStr)
     }
 
-    private fun decodeBinaryStr(binaryStr: String) {
-        var index = 0
-        //var indexToStop = Int.MAX_VALUE
-        val len = binaryStr.length
+    private fun parsePacket(binaryStr: String): Packet {
+        val versionBits = binaryStr.substring(index, index + 3)
+        val version = binaryStrToBigInt(versionBits).toInt()
+        index += 3
 
-        println("Processing: $binaryStr")
-        println("Len: ${binaryStr.length}")
-        while (true) {
-            println("-----------------------")
-            println("index: $index")
-            if (index >= len) {
-                break
-            }
+        val typeBits = binaryStr.substring(index, index + 3)
+        val typeId = binaryStrToBigInt(typeBits).toInt()
+        index += 3
 
-            if (binaryStr.substring(index).map { it.digitToInt() }.sum() == 0) {
-                // few extra 0 bits at the end
-                break
-            }
-
-            val versionBits = binaryStr.substring(index, index + 3)
-            val version = binaryStrToBigInt(versionBits)
-            versionNumbersSum += version.toInt()
-            println("versionBits: $versionBits, version: $version")
-            index += 3
-
-            val typeBits = binaryStr.substring(index, index + 3)
-            val typeId = binaryStrToBigInt(typeBits)
-            println("typeBits: $typeBits, type: $typeId")
-            index += 3
-
-            if (typeId == BigInteger.valueOf(4L)) {
-                println("*Literal value packet*")
-                var res = ""
-                var firstBit = -1
-                //var index = 0
-                while (firstBit != 0) {
-                    firstBit = binaryStr[index].digitToInt()
-                    val v = binaryStr.substring(index + 1, index + 5)
-                    res += v
-                    index += 5
-                }
-                val value = binaryStrToBigInt(res)
-                println("Literal value: $res: $value")
-            } else {
-                println("*Operator packet*")
-                val lengthTypeId = binaryStr[index].digitToInt()
-                println("Length type id: $lengthTypeId")
-                index++
-                if (lengthTypeId == 0) {
-                    // then the next 15 bits are a number that represents the total length in bits of the sub-packets contained by this packet.
-                    val v = binaryStr.substring(index, index + 15)
-                    val totalLength = binaryStrToBigInt(v)
-                    println("v:$v, Length: $totalLength")
-                    index += 15
-                    val indexToStop = index + totalLength.toInt()
-                    println("Decode from $index to $indexToStop")
-                    decodeBinaryStr(binaryStr.substring(index, indexToStop))
-                    index = indexToStop
-                    println("Continue at index: $index")
-                } else {
-                    val v = binaryStr.substring(index, index + 11)
-                    val numberSubPackets = binaryStrToBigInt(v)
-                    println("numberSubPackets: $numberSubPackets")
-                    index += 11
-                }
-            }
+        return when (typeId) {
+            4 -> parseLiteralValuePacket(version, hex)
+            else -> parseOperatorPacket(version, typeId, hex)
         }
     }
 
+    private fun parseLiteralValuePacket(
+        version: Int,
+        hex: String,
+    ): Packet.LiteralValuePacket {
+        var res = ""
+        var firstBit = -1
+        while (firstBit != 0) {
+            firstBit = hex[index].digitToInt()
+            val v = hex.substring(index + 1, index + 5)
+            res += v
+            index += 5
+        }
+        val value = binaryStrToBigInt(res)
+
+        return Packet.LiteralValuePacket(
+            version = version,
+            value = value
+        )
+    }
+
+    private fun parseOperatorPacket(
+        version: Int,
+        typeId: Int,
+        hex: String,
+    ): Packet.OperatorPacket {
+        val lengthTypeId = hex[index].digitToInt()
+        index++
+        var subPackets = ArrayList<Packet>()
+
+        if (lengthTypeId == 0) {
+            // then the next 15 bits are a number that represents the total length in bits of the sub-packets
+            // contained by this packet.
+            val v = hex.substring(index, index + 15)
+            val totalLength = binaryStrToBigInt(v)
+            index += 15
+            val indexToStop = index + totalLength.toInt()
+            while (index < indexToStop) {
+                subPackets.add(parsePacket(hex))
+            }
+        } else {
+            // then the next 11 bits are a number that represents the number of sub-packets immediately contained
+            // by this packet.
+            val v = hex.substring(index, index + 11)
+            val numberSubPackets = binaryStrToBigInt(v)
+            index += 11
+            repeat(numberSubPackets.toInt()) {
+                subPackets.add(parsePacket(hex))
+            }
+        }
+
+        return Packet.OperatorPacket(
+            version = version,
+            typeId = typeId,
+            subPackets = subPackets
+        )
+    }
+
+}
+
+private sealed class Packet(
+    open val version: Int = 1,
+    open val typeId: Int = -1,
+) {
+
+    data class LiteralValuePacket(
+        override val version: Int = 1,
+        val value: BigInteger,
+    ) : Packet(version, typeId = 4) {
+        override fun toString(): String {
+            return value.toString()
+        }
+    }
+
+    data class OperatorPacket(
+        override val version: Int = 1,
+        override val typeId: Int = -1,
+        val op: Op = Op.parse(typeId),
+        val subPackets: ArrayList<Packet> = ArrayList()
+    ) : Packet(version, typeId) {
+
+        override fun toString(): String {
+            return "$op: $subPackets"
+        }
+    }
+
+    fun getVersionSum(): Int {
+        return when (this) {
+            is LiteralValuePacket -> this.version
+            is OperatorPacket -> this.version + this.subPackets.map { it.getVersionSum() }.sum()
+        }
+    }
+
+}
+
+enum class Op(val typeId: Int) {
+    SUM(0), MUL(1), MIN(2), MAX(3), GRT(5), LES(6), EQU(7);
+
+    companion object {
+        fun parse(t: Int) = values().first { it.typeId == t }
+    }
 }
 
 val hexToIntMap = mapOf(
