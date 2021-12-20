@@ -143,7 +143,6 @@ private sealed class Packet(
         val op: Op = Op.parse(typeId),
         val subPackets: ArrayList<Packet> = ArrayList()
     ) : Packet(version, typeId) {
-
         override fun toString(): String {
             return "$op: $subPackets"
         }
