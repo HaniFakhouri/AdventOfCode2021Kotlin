@@ -131,22 +131,14 @@ private sealed class Packet(
     data class LiteralValuePacket(
         override val version: Int = 1,
         val value: Long,
-    ) : Packet(version, typeId = 4) {
-        override fun toString(): String {
-            return value.toString()
-        }
-    }
+    ) : Packet(version, typeId = 4)
 
     data class OperatorPacket(
         override val version: Int = 1,
         override val typeId: Int = -1,
         val op: Op = Op.parse(typeId),
         val subPackets: ArrayList<Packet> = ArrayList()
-    ) : Packet(version, typeId) {
-        override fun toString(): String {
-            return "$op: $subPackets"
-        }
-    }
+    ) : Packet(version, typeId)
 
     // returns true if this packet is an operator packet with only literal sub packets i.e. an operator packet that does
     // not contain other operator sub packets
