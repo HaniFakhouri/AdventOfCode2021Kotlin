@@ -140,8 +140,7 @@ private sealed class Packet(
         val subPackets: ArrayList<Packet> = ArrayList()
     ) : Packet(version, typeId)
 
-    // returns true if this packet is an operator packet with only literal sub packets i.e. an operator packet that does
-    // not contain other operator sub packets
+    // returns true if this packet is an operator packet with only literal sub packets
     fun isPureOpPacket(): Boolean {
         if (this !is OperatorPacket) {
             return false
