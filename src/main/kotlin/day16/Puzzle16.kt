@@ -27,12 +27,6 @@ class Puzzle16 : PuzzleTemplate(day = 16) {
         answer(packet.version + versionSum)
     }
 
-    private fun String.readNextBits(start: Int = 0, bits: Int): String {
-        return this.substring(index + start, index + bits).also {
-            index += bits
-        }
-    }
-
     override fun puzzleTwoLong(answer: Long?.() -> Unit) {
         index = 0
         val packet = parsePacket(binary)
@@ -110,6 +104,12 @@ class Puzzle16 : PuzzleTemplate(day = 16) {
             packet.applyOp()
         } else {
             packet
+        }
+    }
+
+    private fun String.readNextBits(start: Int = 0, bits: Int): String {
+        return this.substring(index + start, index + bits).also {
+            index += bits
         }
     }
 
